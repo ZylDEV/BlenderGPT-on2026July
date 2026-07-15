@@ -1,29 +1,35 @@
-# BlenderGPT - AI-Powered Blender Assistant
+# BlenderGPT - AI Blender Assistant
 
-Generate and execute Blender Python code using natural language, powered by **DeepSeek AI** (or any OpenAI-compatible API).
+**Version 3.3** | Blender 5.1+ | DeepSeek AI
+
+An intelligent AI agent that fully controls Blender via natural language. Powered by DeepSeek AI (OpenAI-compatible). Features auto error fixing, full scene understanding, and chat-based interaction.
+
+---
 
 ## Features
 
-- **Natural Language to Blender Code** - Describe what you want in plain English, and AI writes the Python code for you
-- **One-Click Execute** - Generated code runs instantly inside Blender
-- **Show Code** - View, inspect, and re-run generated scripts in Blender's Text Editor
-- **Chat History** - Full conversation history with delete and clear options
-- **Multi-Model Support** - Works with DeepSeek Chat, DeepSeek Reasoner, and any OpenAI-compatible API
-- **Secure API Key Storage** - Your API key is stored securely in Blender's add-on preferences
+- **Chat-Based AI Agent** - Natural conversation with full Blender control
+- **Full Scene Understanding** - AI automatically detects all objects, materials, animations, collections, and scene state before responding
+- **Complete Blender Control** - Modeling, animation, materials, rendering, physics, particles, compositing, VSE, and everything else
+- **Auto Error Learning** - When code fails, AI apologizes, analyzes the root cause, learns from it, and provides a fix
+- **3x Auto-Retry** - Up to 3 attempts with different approaches on error
+- **Self-Review Protocol** - AI checks 10 common bugs before outputting code
+- **DeepSeek Reasoner Support** - Uses advanced reasoning model for complex tasks by default
+- **Image Upload** - Send images for AI to analyze (vision support)
+- **Upload & Analyze Images** - AI can see and describe images related to 3D modeling
+- **Chat Bubbles UI** - Clean chat interface with user/AI message separation
+- **Thinking Indicator** - Shows when AI is processing
+- **View Code** - Inspect generated Python code in Blender's Text Editor
+- **Run Code** - Execute AI-generated code with one click
+- **Auto-Execute Toggle** - Automatically run generated code or review first
+- **Full Chat History** - AI remembers entire conversation context
+- **Multi-Model** - Supports DeepSeek Chat, DeepSeek Reasoner, and any OpenAI-compatible API
 
-## Requirements
+---
 
-| Software | Version |
-|---|---|
-| Blender | 5.1 or later |
-| Python | 3.11+ (bundled with Blender) |
-| OpenAI Python lib | >= 1.0.0 |
+## Quick Start
 
-## Installation
-
-### 1. Install the OpenAI Library
-
-BlenderGPT requires the official OpenAI Python SDK. Install it using Blender's bundled Python:
+### 1. Install OpenAI Library
 
 ```bash
 # Windows
@@ -36,147 +42,123 @@ BlenderGPT requires the official OpenAI Python SDK. Install it using Blender's b
 /path/to/blender/5.1/python/bin/python3 -m pip install openai>=1.0.0
 ```
 
-Alternatively, install it system-wide:
-```bash
-pip install openai>=1.0.0
-```
-
-### 2. Install the Add-on
+### 2. Install Add-on
 
 1. Download or clone this repository
 2. Open Blender -> `Edit` -> `Preferences` -> `Add-ons`
-3. Click `Install...` and select the `BlenderGPT-main` folder as ZIP
-4. Enable **"AI Blender Assistant"** by checking the checkbox
+3. Click `Install...` and select the folder as ZIP
+4. Enable **"AI Blender Assistant"**
 
-> **Tip:** If you are developing locally, you can symlink the folder to Blender's add-ons directory:
-> - Windows: `%APPDATA%\Blender Foundation\Blender\5.1\scripts\addons\`
-> - macOS: `~/Library/Application Support/Blender/5.1/scripts/addons/`
-> - Linux: `~/.config/blender/5.1/scripts/addons/`
+### 3. Set API Key
 
-### 3. Set Your API Key
+1. `Edit` -> `Preferences` -> `Add-ons`
+2. Expand **"AI Blender Assistant"**
+3. Paste your **DeepSeek API Key**
+4. Get a key at: https://platform.deepseek.com
 
-1. Go to `Edit` -> `Preferences` -> `Add-ons`
-2. Find **"AI Blender Assistant"**
-3. Click the arrow to expand preferences
-4. Paste your **DeepSeek API Key** (or other provider's key)
-5. You can also set the `DEEPSEEK_API_KEY` environment variable as a fallback
+### 4. Use It
 
-### 4. Usage
+1. Press `N` in 3D Viewport to open sidebar
+2. Click the **"AI"** tab
+3. Type your request and click **"Send"**
 
-1. In the **3D Viewport**, press `N` to open the sidebar
-2. Navigate to the **"AI Assistant"** tab
-3. Select your AI model from the dropdown
-4. Type your command in natural language, for example:
-   - *"Create a cube at the origin"*
-   - *"Add a UV sphere with 32 segments"*
-   - *"Create a 3D donut with icing and sprinkles"*
-   - *"Animate a cube rotating 360 degrees on the Y axis"*
-5. Click **"Execute"** and watch the magic happen
+---
 
-## Switching to Other AI Providers
+## Examples
 
-BlenderGPT supports any API that is **OpenAI-compatible** (OpenAI, Groq, Together AI, Anthropic via proxy, etc.). Here is how to customize:
+| Command | What Happens |
+|---|---|
+| "Create a 3D scene with a cube, sphere, and cylinder" | Creates objects at appropriate positions |
+| "Animate all selected objects rotating" | Adds keyframes for rotation animation |
+| "Add a red glossy material to the cube" | Creates and assigns material with nodes |
+| "Set up a camera at 45 degrees and a sun light" | Adds and positions camera + light |
+| "Switch to wireframe view" | Changes viewport shading to wireframe |
+| "Render the current scene at 1080p" | Configures and renders |
+| "Add a bevel modifier to all objects" | Applies modifiers programmatically |
+| "What's in this scene?" | AI reads and describes all objects |
+| "Parent all objects to an empty" | Creates parent-child relationships |
+| "Fix: [paste error]" | AI analyzes error and provides fix |
 
-### Option A: Change Provider in the Code (Permanent)
+---
 
-Edit `utilities.py` and change the `base_url`:
+## How It Works
+
+1. **User sends a message** in the chat panel
+2. **Scene context is captured** - AI receives full report of all objects, materials, collections, animations, and scene state
+3. **System prompt activates** - AI follows Blender API reference and self-review protocol
+4. **AI generates response** - Natural language explanation + Python code in ```python block
+5. **Code is ready** - Click "Run" to execute, or "View" to inspect
+6. **Auto-fix** - If code errors, AI apologizes, analyzes, learns, and fixes (up to 3 attempts)
+
+---
+
+## Switching AI Providers
+
+BlenderGPT supports any OpenAI-compatible API. Edit `utilities.py`:
 
 ```python
 # DeepSeek (default)
-client = OpenAI(
-    api_key=api_key,
-    base_url="https://api.deepseek.com"
-)
+client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
 
 # OpenAI
-client = OpenAI(
-    api_key=api_key,
-    base_url="https://api.openai.com/v1"
-)
+client = OpenAI(api_key=api_key, base_url="https://api.openai.com/v1")
 
 # Groq
-client = OpenAI(
-    api_key=api_key,
-    base_url="https://api.groq.com/openai/v1"
-)
+client = OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
 
-# Together AI
-client = OpenAI(
-    api_key=api_key,
-    base_url="https://api.together.xyz/v1"
-)
-
-# GitHub Models (free with Copilot subscription)
-client = OpenAI(
-    api_key=api_key,
-    base_url="https://models.inference.ai.azure.com"
-)
-
-# Local LLM (Ollama, LM Studio, etc.)
-client = OpenAI(
-    api_key="not-needed",
-    base_url="http://localhost:11434/v1"
-)
+# Local LLM (Ollama)
+client = OpenAI(api_key="not-needed", base_url="http://localhost:11434/v1")
 ```
 
-### Option B: Add Model Selection to the UI
+---
 
-To add more models to the dropdown, edit `__init__.py` in the `register()` function:
+## Requirements
 
-```python
-bpy.types.Scene.gpt4_model = bpy.props.EnumProperty(
-    name="AI Model",
-    description="Select the AI model",
-    items=[
-        ("deepseek-chat", "DeepSeek Chat", ""),
-        ("deepseek-reasoner", "DeepSeek Reasoner", ""),
-        # Add your custom models here
-        ("gpt-4o", "GPT-4o", "OpenAI GPT-4o"),
-        ("gpt-4o-mini", "GPT-4o Mini", "OpenAI GPT-4o Mini"),
-        ("llama-3.3-70b", "Llama 3.3 70B", "Groq Llama 3.3"),
-        ("mixtral-8x7b", "Mixtral 8x7B", "Groq Mixtral"),
-    ],
-    default="deepseek-chat",
-)
-```
+| Software | Version |
+|---|---|
+| Blender | 5.1 or later |
+| Python | 3.11+ (bundled) |
+| openai | >= 1.0.0 |
+| DeepSeek API Key | Free at platform.deepseek.com |
 
-> **Note:** When switching providers, make sure your API key matches the provider you selected, and the model name is supported by that provider.
-
-## Supported Models (Default)
-
-| Model | Description | Best For |
-|---|---|---|
-| DeepSeek Chat | Fast, general-purpose model | Daily Blender scripting tasks |
-| DeepSeek Reasoner | Advanced reasoning model | Complex 3D math and logic |
+---
 
 ## Project Structure
 
 ```
 BlenderGPT-main/
-├── __init__.py          # Add-on registration, UI panel, operators
-├── utilities.py         # API client, code generation, helpers
+├── __init__.py          # UI, operators, system prompt, scene context
+├── utilities.py         # OpenAI client, API calls, image encoding
 ├── requirements.txt     # Python dependencies
 ├── README.md            # This file
-├── LICENSE.md           # License information
-└── lib/                 # Bundled Python libraries (openai, httpx, etc.)
+├── LICENSE.md           # MIT License
+└── lib/                 # Bundled Python libraries
 ```
+
+---
 
 ## Troubleshooting
 
 | Problem | Solution |
 |---|---|
-| "OpenAI library not found" | Run `pip install openai>=1.0.0` using Blender's Python |
-| "No API key detected" | Set your API key in Edit -> Preferences -> Add-ons -> AI Blender Assistant |
-| "Permission denied" | Make sure your Python environment has write access, or use the bundled `lib/` folder |
-| Model not responding | Verify your API key is valid and has credits/quota |
-| Code execution error | Check the System Console (`Window` -> `Toggle System Console`) for details |
+| OpenAI library not found | `pip install openai>=1.0.0` using Blender's Python |
+| No API key detected | Set key in Edit -> Preferences -> Add-ons |
+| Model not responding | Check API key validity and credits |
+| Code execution error | Auto-fix handles it. Check System Console for details |
+| UI not showing | Restart Blender, disable/enable add-on |
+
+---
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
+MIT License - See [LICENSE.md](LICENSE.md)
+
+Copyright (c) 2025 **ZylDEV**
+
+---
 
 ## Credits
 
-- Original concept by [ZylDEV](https://github.com/ZylDEV)
-- Adapted for DeepSeek AI & Blender 5.1+
-- Built with [OpenAI Python SDK](https://github.com/openai/openai-python) and [DeepSeek API](https://platform.deepseek.com/)
+Created and maintained by [ZylDEV](https://github.com/ZylDEV)
+
+Built with [OpenAI Python SDK](https://github.com/openai/openai-python) and [DeepSeek API](https://platform.deepseek.com/)
