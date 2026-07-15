@@ -14,10 +14,10 @@ bl_info = {
     "name": "AI Blender Assistant",
     "blender": (5, 1, 0),
     "category": "Object",
-    "author": "ZylDEV", # Diupdate sesuai preferensimu
-    "version": (2, 0, 0),
+    "author": "ZylDEV",
+    "version": (2, 1, 0),
     "location": "3D View > Sidebar > AI Assistant",
-    "description": "Generate Blender Python code using DeepSeek/OpenAI compatible APIs.",
+    "description": "Generate Blender Python code using DeepSeek/OpenAI compatible APIs with image analysis.",
     "warning": "",
     "wiki_url": "",
     "tracker_url": "",
@@ -30,13 +30,44 @@ system_prompt = """You are an assistant made for the purposes of helping the use
 - Do not use cap_ends. Do not do more than what is asked (setting up render settings, adding cameras, etc)
 - Do not respond with anything that is not Python code."""
 
-# 1. BUAT KELAS KHUSUS UNTUK CHAT HISTORY
+# -------------------------------------------------------------------
+# PROPERTY GROUP: Chat Message (with image support)
+# -------------------------------------------------------------------
 class GPT4_ChatMessage(bpy.types.PropertyGroup):
-    type: bpy.props.StringProperty()
-    content: bpy.props.StringProperty()
+    type: bpy.props.StringProperty()        # "user" or "assistant"
+    content: bpy.props.StringProperty()      # text content / generated code
+    image_path: bpy.props.StringProperty(
+        name="Image",
+        description="Uploaded image path",
+        default="",
+        subtype='FILE_PATH',
+    )
 
-# (Sisa Class Operator dan UI tetap sama seperti kodemu: GPT4_OT_DeleteMessage, GPT4_OT_ShowCode, GPT4_PT_Panel, GPT4_OT_ClearChat, GPT4_OT_Execute, GPT4AddonPreferences)
+# -------------------------------------------------------------------
+# OPERATOR: Upload Image
+# -------------------------------------------------------------------
+class GPT4_OT_UploadImage(bpy.types.Operator):
+    bl_idname = "gpt4.upload_image"
+    bl_label = "Upload Image for Analysis"
+    bl_options = {'REGISTER'}
 
+    filepath: bpy.props.StringProperty(subtype='FILE_PATH')
+
+    def execute(self, context):
+        if not os.path.isfile(self.filepath):
+            self.report({'ERROR'}, "File not found!")
+            return {'CANCELLED'}
+        context.scene.gpt4_uploaded_image = self.filepath
+        self.report({'INFO'}, f"Image loaded: {os.path.basename(self.filepath)}")
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+
+# -------------------------------------------------------------------
+# OPERATOR: Delete Message
+# -------------------------------------------------------------------
 class GPT4_OT_DeleteMessage(bpy.types.Operator):
     bl_idname = "gpt4.delete_message"
     bl_label = "Delete Message"
@@ -48,16 +79,15 @@ class GPT4_OT_DeleteMessage(bpy.types.Operator):
         context.scene.gpt4_chat_history.remove(self.message_index)
         return {'FINISHED'}
 
+# -------------------------------------------------------------------
+# OPERATOR: Show Code (open in Text Editor)
+# -------------------------------------------------------------------
 class GPT4_OT_ShowCode(bpy.types.Operator):
     bl_idname = "gpt4.show_code"
     bl_label = "Show Code"
     bl_options = {'REGISTER', 'UNDO'}
 
-    code: bpy.props.StringProperty(
-        name="Code",
-        description="The generated code",
-        default="",
-    )
+    code: bpy.props.StringProperty(name="Code", description="The generated code", default="")
 
     def execute(self, context):
         text_name = "AI_Generated_Code.py"
@@ -81,56 +111,29 @@ class GPT4_OT_ShowCode(bpy.types.Operator):
 
         return {'FINISHED'}
 
-class GPT4_PT_Panel(bpy.types.Panel):
-    bl_label = "AI Blender Assistant"
-    bl_idname = "GPT4_PT_Panel"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_category = "AI Assistant"
-
-    def draw(self, context):
-        layout = self.layout
-        column = layout.column(align=True)
-
-        column.label(text="Chat history:")
-        box = column.box()
-        for index, message in enumerate(context.scene.gpt4_chat_history):
-            if message.type == 'assistant':
-                row = box.row()
-                row.label(text="Assistant: ")
-                show_code_op = row.operator("gpt4.show_code", text="Show Code")
-                show_code_op.code = message.content
-                delete_message_op = row.operator("gpt4.delete_message", text="", icon="TRASH", emboss=False)
-                delete_message_op.message_index = index
-            else:
-                row = box.row()
-                row.label(text=f"User: {message.content}")
-                delete_message_op = row.operator("gpt4.delete_message", text="", icon="TRASH", emboss=False)
-                delete_message_op.message_index = index
-
-        column.separator()
-
-        column.label(text="AI Model:")
-        column.prop(context.scene, "gpt4_model", text="")
-
-        column.label(text="Enter your message:")
-        column.prop(context.scene, "gpt4_chat_input", text="")
-        button_label = "Please wait...(this might take some time)" if context.scene.gpt4_button_pressed else "Execute"
-        row = column.row(align=True)
-        row.operator("gpt4.send_message", text=button_label)
-        row.operator("gpt4.clear_chat", text="Clear Chat")
-
-        column.separator()
-
+# -------------------------------------------------------------------
+# OPERATOR: Clear Chat
+# -------------------------------------------------------------------
 class GPT4_OT_ClearChat(bpy.types.Operator):
     bl_idname = "gpt4.clear_chat"
     bl_label = "Clear Chat"
     bl_options = {'REGISTER', 'UNDO'}
 
+    image_clear: bpy.props.BoolProperty(default=False)
+
     def execute(self, context):
-        context.scene.gpt4_chat_history.clear()
+        if self.image_clear:
+            # Just clear the uploaded image
+            context.scene.gpt4_uploaded_image = ""
+        else:
+            # Clear everything
+            context.scene.gpt4_chat_history.clear()
+            context.scene.gpt4_uploaded_image = ""
         return {'FINISHED'}
 
+# -------------------------------------------------------------------
+# OPERATOR: Send Message (Execute)
+# -------------------------------------------------------------------
 class GPT4_OT_Execute(bpy.types.Operator):
     bl_idname = "gpt4.send_message"
     bl_label = "Send Message"
@@ -143,42 +146,163 @@ class GPT4_OT_Execute(bpy.types.Operator):
     )
 
     def execute(self, context):
+        user_text = context.scene.gpt4_chat_input.strip()
+        image_path = context.scene.gpt4_uploaded_image
+
+        if not user_text and not image_path:
+            self.report({'ERROR'}, "Please enter a message or upload an image.")
+            return {'CANCELLED'}
+
+        # Save user message to history
+        user_msg = context.scene.gpt4_chat_history.add()
+        user_msg.type = 'user'
+        user_msg.content = user_text if user_text else "(Image analysis)"
+        if image_path:
+            user_msg.image_path = image_path
+
+        # Clear input
+        context.scene.gpt4_chat_input = ""
+        context.scene.gpt4_uploaded_image = ""
+
+        # Set loading state
         context.scene.gpt4_button_pressed = True
         bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=1)
 
-        blender_code = generate_blender_code(context.scene.gpt4_chat_input, context.scene.gpt4_chat_history, context, system_prompt)
-
-        message = context.scene.gpt4_chat_history.add()
-        message.type = 'user'
-        message.content = context.scene.gpt4_chat_input
-
-        # Clear the chat input field
-        context.scene.gpt4_chat_input = ""
+        # Generate code
+        blender_code = generate_blender_code(
+            prompt=user_text,
+            chat_history=context.scene.gpt4_chat_history,
+            context=context,
+            system_prompt=system_prompt,
+            image_path=image_path,
+        )
 
         if not blender_code:
             context.scene.gpt4_button_pressed = False
-            self.report({'ERROR'}, "No code generated.")
+            self.report({'ERROR'}, "No code generated. Check System Console for details.")
             return {'CANCELLED'}
 
-        message = context.scene.gpt4_chat_history.add()
-        message.type = 'assistant'
-        message.content = blender_code
+        # Save assistant response
+        assistant_msg = context.scene.gpt4_chat_history.add()
+        assistant_msg.type = 'assistant'
+        assistant_msg.content = blender_code
 
-        global_namespace = globals().copy()
-
-        try:
-            exec(blender_code, global_namespace)
-        except Exception as e:
-            self.report({'ERROR'}, f"Error executing generated code: {e}")
-            context.scene.gpt4_button_pressed = False
-            return {'CANCELLED'}
+        # Optional: Execute the generated code
+        if context.scene.gpt4_auto_execute:
+            global_namespace = globals().copy()
+            try:
+                exec(blender_code, global_namespace)
+            except Exception as e:
+                self.report({'ERROR'}, f"Error executing code: {e}")
+                context.scene.gpt4_button_pressed = False
+                return {'CANCELLED'}
 
         context.scene.gpt4_button_pressed = False
         return {'FINISHED'}
 
-def menu_func(self, context):
-    self.layout.operator(GPT4_OT_Execute.bl_idname)
+# -------------------------------------------------------------------
+# UI LIST: Chat History
+# -------------------------------------------------------------------
+class GPT4_UL_ChatList(bpy.types.UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index, flt_flag):
+        if self.layout_type in {'DEFAULT', 'COMPACT'}:
+            row = layout.row(align=True)
 
+            if item.type == 'user':
+                # User message
+                label_text = item.content[:55] + "..." if len(item.content) > 55 else item.content
+                if item.image_path:
+                    img_name = os.path.basename(item.image_path)
+                    row.label(text="", icon='FILE_IMAGE')
+                    row.label(text=f"[IMG] {img_name[:20]}")
+                else:
+                    row.label(text="", icon='USER')
+                    row.label(text=label_text)
+            else:
+                # Assistant message
+                label_text = item.content[:55] + "..." if len(item.content) > 55 else item.content
+                row.label(text="", icon='INFO')
+                row.label(text=label_text)
+                show_op = row.operator("gpt4.show_code", text="", icon='TEXT')
+                show_op.code = item.content
+
+            # Delete button
+            del_op = row.operator("gpt4.delete_message", text="", icon='X', emboss=False)
+            del_op.message_index = index
+
+    def draw_filter(self, context, layout):
+        pass
+
+# -------------------------------------------------------------------
+# PANEL: Main UI
+# -------------------------------------------------------------------
+class GPT4_PT_Panel(bpy.types.Panel):
+    bl_label = "AI Blender Assistant"
+    bl_idname = "GPT4_PT_Panel"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = "AI Assistant"
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+
+        # --- Chat History ---
+        box = layout.box()
+        box.label(text="Chat History:", icon='COMMUNICATION')
+        if len(scene.gpt4_chat_history) > 0:
+            row = box.row()
+            row.template_list(
+                "GPT4_UL_ChatList",
+                "",
+                scene,
+                "gpt4_chat_history",
+                scene,
+                "gpt4_chat_index",
+                rows=8,
+            )
+        else:
+            box.label(text="No messages yet.")
+
+        layout.separator()
+
+        # --- Image Upload ---
+        if scene.gpt4_uploaded_image:
+            row = layout.row(align=True)
+            row.label(text="", icon='FILE_IMAGE')
+            row.label(text=os.path.basename(scene.gpt4_uploaded_image))
+            # Clear just the uploaded image
+            op = row.operator("gpt4.clear_chat", text="", icon='X', emboss=False)
+            op.image_clear = True
+
+        # --- Model Selection ---
+        col = layout.column(align=True)
+        col.label(text="AI Model:")
+        col.prop(scene, "gpt4_model", text="")
+
+        # --- Auto Execute Toggle ---
+        row = col.row(align=True)
+        row.prop(scene, "gpt4_auto_execute", text="Auto-execute code")
+
+        # --- Input Area ---
+        layout.separator()
+        col = layout.column(align=True)
+        col.label(text="Message:")
+        col.prop(scene, "gpt4_chat_input", text="")
+
+        # --- Action Buttons ---
+        row = layout.row(align=True)
+        row.operator("gpt4.upload_image", text="", icon='FILE_IMAGE')
+
+        btn_label = "Thinking..." if scene.gpt4_button_pressed else "Send"
+        row.operator("gpt4.send_message", text=btn_label)
+
+        row = layout.row(align=True)
+        row.operator("gpt4.clear_chat", text="Clear Chat", icon='TRASH')
+
+# -------------------------------------------------------------------
+# ADDON PREFERENCES
+# -------------------------------------------------------------------
 class GPT4AddonPreferences(bpy.types.AddonPreferences):
     bl_idname = __package__
 
@@ -192,12 +316,23 @@ class GPT4AddonPreferences(bpy.types.AddonPreferences):
     def draw(self, context):
         layout = self.layout
         layout.prop(self, "api_key")
+        layout.label(text="Get your API key at: https://platform.deepseek.com")
 
-# Kumpulkan semua class untuk diregistrasi
+# -------------------------------------------------------------------
+# MENU ITEM
+# -------------------------------------------------------------------
+def menu_func(self, context):
+    self.layout.operator(GPT4_OT_Execute.bl_idname)
+
+# -------------------------------------------------------------------
+# REGISTRATION
+# -------------------------------------------------------------------
 classes = (
-    GPT4_ChatMessage, # Registrasi properti custom pertama
+    GPT4_ChatMessage,
     GPT4AddonPreferences,
+    GPT4_OT_UploadImage,
     GPT4_OT_Execute,
+    GPT4_UL_ChatList,
     GPT4_PT_Panel,
     GPT4_OT_ClearChat,
     GPT4_OT_ShowCode,
@@ -210,19 +345,26 @@ def register():
 
     bpy.types.VIEW3D_MT_mesh_add.append(menu_func)
 
-    # Inisialisasi Properties pada Scene
+    # Scene Properties
     bpy.types.Scene.gpt4_chat_history = bpy.props.CollectionProperty(type=GPT4_ChatMessage)
+    bpy.types.Scene.gpt4_chat_index = bpy.props.IntProperty(default=0)
     bpy.types.Scene.gpt4_model = bpy.props.EnumProperty(
         name="AI Model",
         description="Select the AI model",
         items=[
-            ("deepseek-chat", "DeepSeek Chat", ""),
-            ("deepseek-reasoner", "DeepSeek Reasoner", ""),
+            ("deepseek-chat", "DeepSeek Chat", "Fast general-purpose model"),
+            ("deepseek-reasoner", "DeepSeek Reasoner", "Advanced reasoning model"),
         ],
         default="deepseek-chat",
     )
     bpy.types.Scene.gpt4_chat_input = bpy.props.StringProperty(name="Message", default="")
     bpy.types.Scene.gpt4_button_pressed = bpy.props.BoolProperty(default=False)
+    bpy.types.Scene.gpt4_uploaded_image = bpy.props.StringProperty(default="")
+    bpy.types.Scene.gpt4_auto_execute = bpy.props.BoolProperty(
+        name="Auto Execute",
+        description="Automatically execute generated code",
+        default=True,
+    )
 
 def unregister():
     for cls in reversed(classes):
@@ -230,11 +372,14 @@ def unregister():
 
     bpy.types.VIEW3D_MT_mesh_add.remove(menu_func)
 
-    # Hapus Properties
+    # Cleanup Properties
     del bpy.types.Scene.gpt4_chat_history
+    del bpy.types.Scene.gpt4_chat_index
     del bpy.types.Scene.gpt4_chat_input
     del bpy.types.Scene.gpt4_model
     del bpy.types.Scene.gpt4_button_pressed
+    del bpy.types.Scene.gpt4_uploaded_image
+    del bpy.types.Scene.gpt4_auto_execute
 
 if __name__ == "__main__":
     register()
